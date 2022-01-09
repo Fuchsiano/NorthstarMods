@@ -1,0 +1,35 @@
+resource/ui/menus/test_window.menu
+{
+	menu
+	{
+		ControlName				menuTest
+		xpos					0
+		ypos					0
+		zpos					3
+		wide					1024   //standart f0 
+		tall					512    //standart f0
+		autoResize				0
+		visible					1
+		enabled					1
+		pinCorner				0
+		PaintBackgroundType		0
+		infocus_bgcolor_override	"0 0 0 0"
+		outoffocus_bgcolor_override	"0 0 0 0"
+		
+		// classname  //think to connect this to script idk
+		//scriptID -> int // dont know 
+
+		//is a  image tag   para = string of filepath 
+		//scaleImage = 1 dont know if this is needed 
+		
+		// pin optionen  
+		//	pin_to_sibling		
+		//	pin_corner_to_sibling	TOP_LEFT
+		//	pin_to_sibling_corner	BOTTOM_LEFT
+
+		// labelText -> string mit "" 
+		// textAlignment -> west / center  
+		
+		// InheritProperties   //bro dont know only used 2 times 
+	}
+}

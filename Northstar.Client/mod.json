@@ -52,6 +52,15 @@
 		},
 		
 		{
+			"Path": "ui/menu_ban_system.nut",
+			"RunOn": "UI",
+			"UICallback": {
+				"After": "banMenuInit"
+			}
+
+		},
+		
+		{
 			"Path": "ui/menu_ns_custom_match_settings_categories.nut",
 			"RunOn": "UI",
 			"UICallback": {
