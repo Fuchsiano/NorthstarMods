@@ -4,6 +4,7 @@ global function SvLoadoutsMP_Init
 global function SetLoadoutGracePeriodEnabled
 global function SetWeaponDropsEnabled
 global function GetTitanLoadoutForPlayer
+global function GetTitanLoadoutIndexByName
 
 struct {
 	bool loadoutGracePeriodEnabled = true
@@ -278,4 +279,34 @@ void function TryGivePilotLoadoutForGracePeriod( entity player )
 		else
 			SendHudMessage( player, "#LOADOUT_CHANGE_NEXT_BOTH", -1, 0.4, 255, 255, 255, 255, 0.15, 3.0, 0.5 ) // like 90% sure this is innacurate lol
 	}
+}
+
+int function GetTitanLoadoutIndexByName(string TitanName)
+{
+	switch(TitanName)
+	{
+	
+	case"ion" :
+	return 0
+
+	case "scorch" :
+	return 1
+
+	case "northstar":
+	return 2 
+
+	case "ronin" :
+	return 3
+
+	case "tone" :
+	return 4
+
+	case "legion" :
+	return 5
+
+	case "vanguard" :
+	return 6 
+	}
+
+	return -1
 }

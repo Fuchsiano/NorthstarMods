@@ -60,12 +60,15 @@ void function OpenMenuuu(var woo)
 {
   AdvanceMenu( GetMenu( "BanMenu" ) )
 }
+
 void function Printloadout(var woo)
 {
   Assert( uiGlobal.editingLoadoutType == "pilot" )
 
   PilotLoadoutDef loadout = GetCachedPilotLoadout( uiGlobal.editingLoadoutIndex )
   print(  "--------------" + loadout.primaryAttachment)
+   print(  "--------------" + loadout.primaryMod1)
+   print(  "--------------" + loadout.primaryMod2)
   
 
  //var image = GetImage(eItemTypes.PILOT_PRIMARY_ATTACHMENT, loadout.primaryAttachment , "" )
@@ -73,6 +76,7 @@ void function Printloadout(var woo)
   //print(  "--------------" + image)
 
 }
+
 void function GetWeapon(var woo)
 {
    PilotLoadoutDef loadout = GetCachedPilotLoadout( uiGlobal.editingLoadoutIndex )

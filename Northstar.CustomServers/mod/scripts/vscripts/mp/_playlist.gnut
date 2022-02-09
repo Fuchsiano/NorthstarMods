@@ -9,86 +9,112 @@ struct WeaponStruct {
 	array <string>   visor
 } 
 
+struct BoostStruct
+{
+	string name,
+	bool   disabled
+	int BoostNumber
+}
+
+struct TitanStruct
+{
+	string name, 
+	bool disabled,
+
+	string passive1,
+	string passive2,
+	string passive3,
+
+	//thanks monarch for making me  handeling 3 seperet cores  
+	string core1,
+	string core2,
+	string core3,
+
+}
+
+struct UniversalBan
+{
+	string name,
+	bool disabled
+}
+
 struct {
  array<WeaponStruct> weaponArray 
+ array<UniversalBan> GrenadeArray
+ array<UniversalBan> AbilityArray
+ array<BoostStruct> BoostArray
+ array<TitanStruct> TitanArray
 
 } file
+
 
 
 void function Playlist_Init()
 {
 	// featured mode settings
 	AddCallback_OnPlayerRespawned( FeaturedModeSettingsSetupPilotLoadouts )
+
+	//AddCallback_OnPlayerGetsNewPilotLoadout(FeaturedModeSettingsSetupPilotLoadouts )
 	AddCallback_OnPilotBecomesTitan( FeaturedModeSettingsSetupTitanLoadouts )
 	
-	if ( IsFeaturedMode( "all_holopilot" ) || IsFeaturedMode( "all_grapple" ) || 
-		 IsFeaturedMode( "all_phase" ) || IsFeaturedMode( "all_ticks" ) || 
-		 IsFeaturedMode( "rocket_arena" ) || IsFeaturedMode( "shotguns_snipers" ) || 
-		 IsFeaturedMode( "tactikill" ) || IsFeaturedMode( "amped_tacticals" ) )
-		 SetLoadoutGracePeriodEnabled( false )
-	
+	AddCallback_GameStateEnter( eGameState.Playing, OnGamestartModeSettings)
+	AddCallback_GameStateEnter(	eGameState.Playing, test)
+
+	AddCallback_OnUpdateDerivedPlayerTitanLoadout(TitanTest)
+
 	// iron lts rules
 	if ( HasIronRules() ) 
 		Riff_ForceTitanExitEnabled( eTitanExitEnabled.Never )
-	array<string> wNames
 
-	//index 0-29 
-	//index 0 - 22 primary
-	//index 23 - 25 sec
-	// index 26 - 29 at
-	wNames.append("mp_weapon_rspn101")
-	wNames.append("mp_weapon_rspn101_og")
-	wNames.append("mp_weapon_hemlok")
-	wNames.append("mp_weapon_g2")
-	wNames.append("mp_weapon_vinson")
-	wNames.append("mp_weapon_car")
-	wNames.append("mp_weapon_alternator_smg")
-	wNames.append("mp_weapon_hemlok_smg")
-	wNames.append("mp_weapon_r97")
-	wNames.append("mp_weapon_lmg")
-	wNames.append("mp_weapon_lstar")
-	wNames.append("mp_weapon_esaw")
-	wNames.append("mp_weapon_sniper")
-	wNames.append("mp_weapon_doubletake")
-	wNames.append("mp_weapon_dmr")
-	wNames.append("mp_weapon_shotgun")
-	wNames.append("mp_weapon_mastiff")
-	wNames.append("mp_weapon_smr")
-	wNames.append("mp_weapon_epg")
-	wNames.append("mp_weapon_softball")
-	wNames.append("mp_weapon_pulse_lmg")
-	wNames.append("mp_weapon_wingman_n")
-	wNames.append("mp_weapon_shotgun_pistol")
 
-	wNames.append("mp_weapon_autopistol")
-	wNames.append("mp_weapon_semipistol")
-	wNames.append("mp_weapon_wingman")
+	InitGrenadeArray()
+	InitAbilityArray()
+	InitWeaponArray()
+	InitBoostArray()
+	InitTitanArray()
 
-	wNames.append("mp_weapon_defender ")
-	wNames.append("mp_weapon_mgl")
-	wNames.append("mp_weapon_arc_launcher")
-	wNames.append("mp_weapon_rocket_launcher")
-
-	for(int i = 0; i < wNames.len(); i++ )
+	foreach(entity player in GetPlayerArray())
 	{
-	InitWeaponstruct()
+		GetTitanLoadoutForPlayer(player)
 	}
 
-	// sync gun name array with WeaponStruct  
-	for(int i = 0; i < wNames.len(); i++ )
-	{
-		file.weaponArray[i].name = wNames[i]
-	}
+
 }
 
-bool function IsFeaturedMode( string modeName )
+bool function IsFeaturedMode( string modeName  )
 {
 	return GetCurrentPlaylistVar( "featured_mode_" + modeName ) == "1"
 }
 
-void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
+void function OnGamestartModeSettings()
 {
+	foreach (entity player in GetPlayerArray())
+	{
+		FeaturedModeSettingsSetupPilotLoadouts(player)
+	}
+}
+
+void function FeaturedModeSettingsSetupPilotLoadouts( entity player)
+{
+
+		if ( IsFeaturedMode( "all_holopilot" ) || IsFeaturedMode( "all_grapple" ) || 
+		 IsFeaturedMode( "all_phase" ) || IsFeaturedMode( "all_ticks" ) || 
+		 IsFeaturedMode( "rocket_arena" ) || IsFeaturedMode( "shotguns_snipers" ) || 
+		 IsFeaturedMode( "tactikill" ) || IsFeaturedMode( "amped_tacticals" )||IsFeaturedMode( "BanLogicTest" )  )
+		 SetLoadoutGracePeriodEnabled( false )
+	
+
+	if ( GetGameState() == eGameState.Prematch )
+	{
+		return
+	}
+	else if(player.IsTitan())
+	{
+		return
+	}
+
 	bool shouldChangeLoadout = false
+
 
 	// create loadout struct
 	PilotLoadoutDef modifiedLoadout = clone GetActivePilotLoadout( player )
@@ -175,6 +201,16 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 		}
 	}
 
+	// Weapon ban vars 
+	bool shouldRemovePrim = false
+	bool shouldRemoveSec = false
+	bool shouldRemoveWeapon3 = false
+	bool shouldRemoveGrenade = false
+	bool shouldRemoveAbility = false
+	int MeleeInKit = 0
+	bool EditedKit = false
+	string message  = "Your Kit used Baned weapons: \n"
+
 	if(IsFeaturedMode("BanLogicTest"))
 	{
 		shouldChangeLoadout = true 
@@ -185,17 +221,33 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 		////////////////////////////////////////////////////////////////////////////////////// 
 		///////////////////   Loops to ban weapon  DeV stuff
 		//////////////////////////////////////////////////////////////////////////////////////
-		for(int i = 0; i < 17; i++){
+		
+		//weapon
+		for(int i = 0; i < 15; i++){
+			//file.weaponArray[i].disabled = true
+			file.weaponArray[i].mod1 =  "pas_fast_ads"
+			file.weaponArray[i].mod2 = "pas_fast_reload"
+		} 
+
+		for(int i = 0; i < 12; i++){
 		file.weaponArray[i].disabled = true
 		} 
 
-		for(int i = 23; i < 24; i++){
+		for(int i = 26; i < 28; i++){
 		file.weaponArray[i].disabled = true
 		} 
-
-		for(int i = 26; i < 29; i++){
-		file.weaponArray[i].disabled = true
+		// Ability
+		for(int i = 0; i < 5; i++){
+		file.AbilityArray[i].disabled = true
 		} 
+		// nades
+		for(int i = 0; i < 2; i++){
+		file.GrenadeArray[i].disabled = true
+		} 
+		for(int i = 0; i < 4; i++)
+		{
+			file.TitanArray[i].disabled = true
+		}
 
 		////////////////////////////////////////////////////////////////////////////////////// 
 		///////////////////   Using Code 
@@ -210,11 +262,14 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 			if(modifiedLoadout.primary == weapon.name && weapon.disabled)
 			{
 				printt("----------------------------------- changed prim")
+				EditedKit = true
 
-				WeaponStruct newWeapon = GetFirstAvailablePrimaryWeapon(player)
+				
+				WeaponStruct newWeapon = GetFirstAvailablePrimaryWeapon()
 				if (newWeapon.name != "Null" )
 				{ 
 					modifiedLoadout.primary = newWeapon.name
+					message += "primary changet to: " + newWeapon.name +" \n"
 					// if mod1 is forced && mod 2 is free and its the same as forced mod1 we ignore it, but you can do it if  you want  tf2 wont crash
 					if( newWeapon.mod1 != "UNDEFINED")
 					{
@@ -230,9 +285,8 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 				}
 				else
 				{
-					var  message = "no Primary weapon found changing to Melee"
-					SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-					player.TakeWeapon(modifiedLoadout.primary)
+					shouldRemovePrim = true
+					message += "Primary Removed \n"
 				}
 
 			}
@@ -240,20 +294,25 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 			else if(modifiedLoadout.secondary == weapon.name && weapon.disabled)
 			{
 				printt("----------------------------------- changed SEC ")
+				EditedKit = true
+
+
 				 WeaponStruct  newWeapon
 
 				if ( GetWeaponInfoFileKeyField_Global( player.GetMainWeapons()[ 1 ].GetWeaponClassName(), "menu_category" ) == "at" )
 				{
-				   newWeapon = GetFirstAvailableAtWeapon(player)
+				   newWeapon = GetFirstAvailableAtWeapon()
 				}
 				else
 				{
-			       newWeapon = GetFirstAvailableSecWeapon(player)
+			       newWeapon = GetFirstAvailableSecWeapon()
 				}
 				
 				if (newWeapon.name != "Null" )
 				{ 
 					modifiedLoadout.secondary = newWeapon.name
+					message += "Secondary changet to: " + newWeapon.name +" \n"
+
 					// if mod1 is forced && mod 2 is free and its the same as forced mod1 we ignore it, but you can do it if  you want  tf2 wont crash
 					if( weapon.mod1 != "UNDEFINED")
 					{
@@ -267,28 +326,31 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 				}
 				else
 				{
-					var  message = "no Secondary weapon found changing to Melee"
-					SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-					player.TakeWeapon(modifiedLoadout.secondary)
+					shouldRemoveSec = true
+					message += "Secondary Removed \n"
 				}
 			}
 				//check 3rd Slot
 			else if(modifiedLoadout.weapon3 == weapon.name && weapon.disabled)
 			{
 				printt("----------------------------------- changed weapon 3")
+				EditedKit = true
 				WeaponStruct  newWeapon
  				if ( GetWeaponInfoFileKeyField_Global( player.GetMainWeapons()[ 2 ].GetWeaponClassName(), "menu_category" ) == "at" )
 				{
-				   newWeapon = GetFirstAvailableAtWeapon(player)
+				   newWeapon = GetFirstAvailableAtWeapon()
 				}
 				else
 				{
-			       newWeapon = GetFirstAvailableSecWeapon(player)
+			       newWeapon = GetFirstAvailableSecWeapon()
 				}
 				
 				if (newWeapon.name != "Null" )
 				{ 
 					modifiedLoadout.weapon3 = newWeapon.name
+					
+					message += "Weapon 3 changet to: " + newWeapon.name +" \n"
+
 					if( newWeapon.mod1 != "UNDEFINED")
 					{
 						modifiedLoadout.weapon3Mods[0] = newWeapon.mod1
@@ -301,12 +363,96 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 				}
 				else
 				{
-					var  message = "no slot 3  weapon found changing to Melee"
-					SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-					player.TakeWeapon(modifiedLoadout.weapon3)
+					shouldRemoveWeapon3 = true
+					message += "Weapon 3 Removed \n"
 				}
 			}
+			if(modifiedLoadout.primary == weapon.name && (weapon.mod1 != "UNDEFINED" || weapon.mod2 != "UNDEFINED" ))
+			{
+				modifiedLoadout.primaryMods[0] = weapon.mod1
+				modifiedLoadout.primaryMods[1] = weapon.mod2
+				modifiedLoadout.primaryAttachments = weapon.visor
+			}
+			if(modifiedLoadout.secondary == weapon.name && (weapon.mod1 != "UNDEFINED" || weapon.mod2 != "UNDEFINED" ))
+			{
+				modifiedLoadout.secondaryMods[0] = weapon.mod1
+				modifiedLoadout.secondaryMods[1] = weapon.mod2
+			}
+			if(modifiedLoadout.weapon3 == weapon.name && (weapon.mod1 != "UNDEFINED" || weapon.mod2 != "UNDEFINED" ))
+			{
+				modifiedLoadout.weapon3Mods[0] = weapon.mod1
+				modifiedLoadout.weapon3Mods[1] = weapon.mod2
+			}
+		}
 
+		// Granades
+		for(int GrenadeCheck = 0; GrenadeCheck < file.GrenadeArray.len(); GrenadeCheck++)
+		{
+			UniversalBan grenade = file.GrenadeArray[GrenadeCheck]
+			if(grenade.name == modifiedLoadout.ordnance && grenade.disabled)
+			{
+				printt("----------------------------------- changed Grenade")
+				EditedKit = true
+				UniversalBan newUniversalBan = GetFirstAvailableGrenade()
+				
+				if(newUniversalBan.name != "Null")
+				{
+				    modifiedLoadout.ordnance = newUniversalBan.name
+					message += " Ordanace changed to " + newUniversalBan.name +  " \n"
+				}
+				else
+				{
+					shouldRemoveGrenade = true
+					message += "Granades Removed \n"
+				}
+			} 
+		}
+
+		//Abuility
+		for(int AbilityCheck = 0; AbilityCheck < file.AbilityArray.len(); AbilityCheck++)
+		{
+			UniversalBan Ability =  file.AbilityArray[AbilityCheck]
+			if(Ability.name == modifiedLoadout.special && Ability.disabled)
+			{
+				printt("----------------------------------- changed Ability")
+				EditedKit = true
+				UniversalBan NewAbilityStruct = GetFirstAvailableAbility()
+
+				if(NewAbilityStruct.name != "Null" )
+				{
+				 modifiedLoadout.special = NewAbilityStruct.name
+				 message += "Abillity changed to "+ NewAbilityStruct.name  + " \n"
+				}
+				else
+				{
+				 shouldRemoveAbility = true
+				 message += "Ability Removed  \n"
+				}
+			}
+		}
+
+		//boost
+		for(int BoostCheck = 0; BoostCheck < file.BoostArray.len();BoostCheck++)
+		{
+			BoostStruct boost = file.BoostArray[BoostCheck]
+			if(boost.BoostNumber == player.GetPersistentVar("burnmeterSlot") && boost.disabled)
+			{
+				printt("----------------------------------- changed Boost")
+				EditedKit = true
+
+				BoostStruct newBoostStruct = GetFirstAvailableBoost()
+
+				if(newBoostStruct.name != "Null")
+				{
+					player.SetPersistentVar( "burnmeterSlot",newBoostStruct.BoostNumber )
+					 message += "Boost changed to "+ newBoostStruct.name  + " \n"
+				}
+				else
+				{
+					Riff_ForceBoostAvailability( eBoostAvailability.Disabled )
+					message += "Boost Removed \n"
+				}
+			}
 		}
 
 	}
@@ -315,16 +461,57 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player )
 	if ( shouldChangeLoadout )
 		GivePilotLoadout( player, modifiedLoadout )
 
+
+	if(shouldRemovePrim)
+	{
+		player.TakeWeapon(modifiedLoadout.primary)
+		MeleeInKit++
+	}
+
+	if(shouldRemoveSec)
+	{
+		player.TakeWeapon(modifiedLoadout.secondary)
+		MeleeInKit++
+	}
+
+	if(shouldRemoveWeapon3)
+	{
+		player.TakeWeapon(modifiedLoadout.weapon3)
+		MeleeInKit++
+	}
+
+	if(MeleeInKit == 3)
+	{
+		player.GiveWeapon("mp_weapon_rocket_launcher")
+		player.SetActiveWeaponByName( "mp_weapon_rocket_launcher" )
+	}
+	
+	if(shouldRemoveGrenade)
+		player.TakeOffhandWeapon( OFFHAND_ORDNANCE )
+	
+	if(shouldRemoveAbility)
+		player.TakeOffhandWeapon( OFFHAND_SPECIAL )
+	
+	
+	if(EditedKit)
+		SendHudMessage( player, message, 2.5,-2.5,255,0,0, 255, 0, 4, 1 )
+
+
 	if ( IsFeaturedMode( "tactikill" ) )
 		player.GiveExtraWeaponMod( "tactical_cdr_on_kill" )
 	
 	if ( IsFeaturedMode( "amped_tacticals" ) )
 		player.GiveExtraWeaponMod( "amped_tacticals" )
+
 }
 
 
 void function FeaturedModeSettingsSetupTitanLoadouts( entity player, entity titan )
 {
+	bool shouldChangeTitanLoadout = false
+
+	TitanLoadoutDef Titanloadout = clone GetActiveTitanLoadout(player)
+
 	if ( IsFeaturedMode( "turbo_titans" ) )
 	{
 		array<string> settingsMods = player.GetPlayerSettingsMods()
@@ -336,25 +523,27 @@ void function FeaturedModeSettingsSetupTitanLoadouts( entity player, entity tita
 			player.SetPlayerSettingsWithMods( player.GetPlayerSettings(), settingsMods )
 		}
 	}
+	
+	if(shouldChangeTitanLoadout )
+	{
+		GiveTitanLoadout(player, Titanloadout)
+	}
 }
 
 
 
 
-WeaponStruct function GetFirstAvailablePrimaryWeapon(entity player)
+WeaponStruct function GetFirstAvailablePrimaryWeapon()
 {
-	WeaponStruct newWeapon
-
 	for(int i = 0; i < 23; i++ )
 	{
 		WeaponStruct CurrentCheckingWeapon  =	file.weaponArray[i]
 		
 		if(CurrentCheckingWeapon.disabled == false)
 		{
-			var message = " Used Banned weapon changed to weapon index " + i +" " + CurrentCheckingWeapon.name
-			SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-			newWeapon = CurrentCheckingWeapon
-			return newWeapon
+
+			return CurrentCheckingWeapon
+			
 		}
 	}
 	WeaponStruct nullWeaponStruct  = {name = "Null", disabled = false ,mod1 = "UNDEFINED" , mod2 = "UNDEFINED" , visor = [] } 
@@ -362,46 +551,408 @@ WeaponStruct function GetFirstAvailablePrimaryWeapon(entity player)
 }
 
 
-WeaponStruct function GetFirstAvailableSecWeapon(entity player)
+WeaponStruct function GetFirstAvailableSecWeapon()
 {
-	WeaponStruct newWeapon
  for(int i = 23; i < 26; i++ )
 	{
 		WeaponStruct CurrentCheckingWeapon  =	file.weaponArray[i]
 		
 		if(CurrentCheckingWeapon.disabled == false)
 		{
-			var message = " Used Banned weapon changed to weapon index " + i +" " + CurrentCheckingWeapon.name
-			SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-			newWeapon = CurrentCheckingWeapon
-			return newWeapon
+
+			return  CurrentCheckingWeapon
 		}
 	}
 	WeaponStruct nullWeaponStruct  = {name = "Null", disabled = false ,mod1 = "UNDEFINED" , mod2 = "UNDEFINED" , visor = [] } 
 	return nullWeaponStruct
 }
 
-WeaponStruct function GetFirstAvailableAtWeapon(entity player)
+WeaponStruct function GetFirstAvailableAtWeapon()
 {
-	WeaponStruct newWeapon
  for(int i = 27; i < 30; i++ )
 	{
 		WeaponStruct CurrentCheckingWeapon  =	file.weaponArray[i]
 		
 		if(CurrentCheckingWeapon.disabled == false)
 		{
-			var message = " Used Banned weapon changed to weapon index " + i +" " + CurrentCheckingWeapon.name
-			SendHudMessage( player, message, -1, 0.4, 255, 0, 0, 0, 0, 3, 0.15 )
-			newWeapon = CurrentCheckingWeapon
-			return newWeapon
+			return CurrentCheckingWeapon
+			
 		}
 	}
 	WeaponStruct nullWeaponStruct  = {name = "Null", disabled = false ,mod1 = "UNDEFINED" , mod2 = "UNDEFINED" , visor = [] } 
 	return nullWeaponStruct
 }
 
-void function InitWeaponstruct()
+UniversalBan function GetFirstAvailableGrenade()
 {
-	WeaponStruct newWeaponStruct  = {name ="" , disabled = false ,mod1 = "UNDEFINED" , mod2 = "UNDEFINED" , visor = [] }  
-	file.weaponArray.append(newWeaponStruct)
+	
+	for(int i = 0; i < file.GrenadeArray.len(); i++)
+	{
+		UniversalBan CurrentCheckingGrenade = file.GrenadeArray[i]
+		if(CurrentCheckingGrenade.disabled == false)
+		{
+			return CurrentCheckingGrenade
+		}
+	}
+
+	UniversalBan nullGrenade = {name = "Null", disabled = false}
+	return nullGrenade
+}
+
+UniversalBan function GetFirstAvailableAbility()
+{
+	for(int i = 0; i < file.AbilityArray.len(); i++)
+	{
+		UniversalBan CurrentCheckingAbility = file.AbilityArray[i]
+		if(CurrentCheckingAbility.disabled == false)
+		{
+			return CurrentCheckingAbility
+		}
+	}
+
+	UniversalBan nullAbility = {name = "Null", disabled = false}
+	return nullAbility
+}
+
+BoostStruct function GetFirstAvailableBoost()
+{
+	for(int i = 0; i < file.BoostArray.len(); i++)
+	{
+		BoostStruct CurrentCheckingBoost = file.BoostArray[i]
+
+		if(CurrentCheckingBoost.disabled == false)
+		{
+			return CurrentCheckingBoost
+		}
+	}
+	BoostStruct NullBoost  = {name = "Null", disabled = false, BoostNumber = -1}
+	return NullBoost
+}
+
+TitanStruct function GetFirstAvailableTitan()
+{
+	
+	for(int i = 0; i < file.TitanArray.len(); i++)
+	{
+		TitanStruct CurrentCheckingTitan = file.TitanArray[i]
+		if(CurrentCheckingTitan.disabled == false)
+		{
+			return CurrentCheckingTitan
+		}
+	}
+
+	TitanStruct nullTitan = {name = "Null", disabled = false, passive1 = "", passive2 = "", passive3= "" , core1 = "", core2 = "" core3 = ""}
+	return nullTitan
+}
+
+// tf2 cryes when I do it different it sucks but whatever 
+void function InitGrenadeArray()
+{
+	array<string> GrenadeNames
+
+
+	GrenadeNames.append("mp_weapon_frag_grenade")
+	GrenadeNames.append("mp_weapon_grenade_emp ")
+	GrenadeNames.append("mp_weapon_thermite_grenade")
+	GrenadeNames.append("mp_weapon_grenade_gravity")
+	GrenadeNames.append("mp_weapon_grenade_electric_smoke")
+	GrenadeNames.append("mp_weapon_satchel")
+	
+	for(int i = 0; i < GrenadeNames.len(); i++)
+	{
+		UniversalBan newUniversalBan = {name ="" , disabled = false}
+		file.GrenadeArray.append(newUniversalBan)
+	}
+
+	for(int i = 0; i < GrenadeNames.len(); i++)
+	{
+		file.GrenadeArray[i].name = GrenadeNames[i]
+	}
+}
+
+void function InitAbilityArray()
+{
+	array<string> AbilityNames
+
+	AbilityNames.append("mp_ability_cloak")
+	AbilityNames.append("mp_weapon_grenade_sonar")
+	AbilityNames.append("mp_ability_grapple")
+	AbilityNames.append("mp_ability_heal")
+	AbilityNames.append("mp_weapon_deployable_cover")
+	AbilityNames.append("mp_ability_shifter")
+	AbilityNames.append("mp_ability_holopilot")
+	
+	for(int i = 0; i < AbilityNames.len(); i++)
+	{
+		UniversalBan newAbilityStruct = {name ="" , disabled = false}
+		file.AbilityArray.append(newAbilityStruct)
+	}
+
+	for(int i = 0; i < AbilityNames.len(); i++)
+	{
+		file.AbilityArray[i].name = AbilityNames[i]
+	}
+}
+
+void function InitWeaponArray()
+{
+	array<string> wNames
+
+	//index 0-29 
+	//index 0 - 22 primary
+	//index 23 - 25 sec
+	// index 26 - 29 at
+	wNames.append("mp_weapon_rspn101")
+	wNames.append("mp_weapon_rspn101_og")
+	wNames.append("mp_weapon_hemlok")
+	wNames.append("mp_weapon_g2")
+	wNames.append("mp_weapon_vinson")
+	wNames.append("mp_weapon_car")
+	wNames.append("mp_weapon_alternator_smg")
+	wNames.append("mp_weapon_hemlok_smg")
+	wNames.append("mp_weapon_r97")
+	wNames.append("mp_weapon_lmg")
+	wNames.append("mp_weapon_lstar")
+	wNames.append("mp_weapon_esaw")
+	wNames.append("mp_weapon_sniper")
+	wNames.append("mp_weapon_doubletake")
+	wNames.append("mp_weapon_dmr")
+	wNames.append("mp_weapon_shotgun")
+	wNames.append("mp_weapon_mastiff")
+	wNames.append("mp_weapon_smr")
+	wNames.append("mp_weapon_epg")
+	wNames.append("mp_weapon_softball")
+	wNames.append("mp_weapon_pulse_lmg")
+	wNames.append("mp_weapon_wingman_n")
+	wNames.append("mp_weapon_shotgun_pistol")
+
+	wNames.append("mp_weapon_autopistol")
+	wNames.append("mp_weapon_semipistol")
+	wNames.append("mp_weapon_wingman")
+
+	wNames.append("mp_weapon_defender ")
+	wNames.append("mp_weapon_mgl")
+	wNames.append("mp_weapon_arc_launcher")
+	wNames.append("mp_weapon_rocket_launcher")
+
+	for(int i = 0; i < wNames.len(); i++ )
+	{
+		WeaponStruct newWeaponStruct  = {name ="" , disabled = false ,mod1 = "UNDEFINED" , mod2 = "UNDEFINED" , visor = [""] }  
+		file.weaponArray.append(newWeaponStruct)
+	}
+
+	// sync gun name array with WeaponStruct  
+	for(int i = 0; i < wNames.len(); i++ )
+	{
+		file.weaponArray[i].name = wNames[i]
+	}
+}
+
+void function InitBoostArray()
+{
+	array<string> BoostNames
+
+	BoostNames.append("burnmeter_maphack")
+	BoostNames.append("burnmeter_amped_weapons")
+	BoostNames.append("burnmeter_ticks")
+	BoostNames.append("burnmeter_random_foil")
+	BoostNames.append("burnmeter_ap_turret_weapon")
+	BoostNames.append("burnmeter_phase_rewind")
+	BoostNames.append("burnmeter_at_turret_weapon")
+	BoostNames.append("burnmeter_holopilot_nova")
+	BoostNames.append("burnmeter_emergency_battery")
+	BoostNames.append("burnmeter_smart_pistol")
+	BoostNames.append("burnmeter_radar_jammer")
+	BoostNames.append("burnmeter_hard_cover")
+
+	for(int i = 0; i < 12; i++)
+	{
+		BoostStruct newBoostStruct = {name ="" , disabled = false, BoostNumber =  0}
+		file.BoostArray.append(newBoostStruct)
+	}
+
+	for(int i = 0; i < 12; i++)
+	{
+		file.BoostArray[i].name = BoostNames[i]
+		file.BoostArray[i].BoostNumber = i 
+	}
+}
+
+void function InitTitanArray()
+{
+	array<string> TitanNames
+
+
+	TitanNames.append("ion")
+	TitanNames.append("scorch")
+	TitanNames.append("northstar")
+	TitanNames.append("ronin")
+	TitanNames.append("tone")
+	TitanNames.append("legion")
+	TitanNames.append("vanguard")
+
+	for(int i = 0; i < TitanNames.len(); i++)
+	{
+		TitanStruct newTitan = {name = "Null", disabled = false , passive1 = "UNDEFINED", passive2 = "UNDEFINED", passive3= "UNDEFINED" , core1 = "UNDEFINED", core2 = "UNDEFINED" core3 = "UNDEFINED"}
+		file.TitanArray.append(newTitan)
+	}
+	for(int i = 0; i < TitanNames.len(); i++)
+	{
+		file.TitanArray[i].name = TitanNames[i]
+	}
+}
+
+
+void function test()
+{
+	foreach(entity player in GetPlayerArray())
+	{
+	for(int i = 0; i < 3; i++){
+	// print("----------------------------------------------------------------------------Test--------------------------------------------" +GetWeaponInfoFileKeyField_Global( player.GetMainWeapons()[ i ].GetWeaponClassName(), "menu_category" ))
+	}
+	}
+}
+
+
+void function TitanTest(entity player,TitanLoadoutDef newTitanLoadout)	
+{
+
+	bool shouldChangeTitanLoadout = false
+	
+	if(newTitanLoadout.titanClass != "ion")
+	{
+	 // newTitanLoadout = GetTitanLoadoutFromPersistentData( player, 0 )
+	 print("-------------------------------- chassi "+ newTitanLoadout.titanClass)
+	 print("---------------------------------primary "+ newTitanLoadout.primary)
+	 print("---------------------------------passive1 " + newTitanLoadout.passive1)
+	
+	print("------------------------------------------------------------------------------------")
+	print("------------------------------------- titan: " + newTitanLoadout.titanClass )
+
+		for(int i =0; i < newTitanLoadout.primaryMod.len(); i++)
+		{
+		 print("------------------------------------- mods: " + newTitanLoadout.primaryMod[i])
+		}
+	//newTitanLoadout.primaryMods = 	[ GetTitanLoadoutFromPersistentData( player, 0 ).primaryMod ]
+
+	print("-------------------------------------------------------" + GetTitanLoadoutFromPersistentData( player, 1 ).primaryMod)
+	
+	 shouldChangeTitanLoadout = true
+	} 
+/*
+	print("------------------- edited Titan loadout")
+	 int loadoutIndex = GetTitanLoadoutIndexByName(newTitanLoadout.titanClass)
+	TitanLoadoutDef loadout = GetTitanLoadoutFromPersistentData( player, loadoutIndex )
+	print("----------------" + loadout.passive1 + " \n" +loadout.passive2 + " \n" +loadout.passive3 + " \n" +loadout.passive4 + " \n" +loadout.passive5 + " \n" +loadout.passive6 + " \n" )
+	print( "-------------------------------------------------"+ GetPersistentLoadoutValue( player, "titan", loadoutIndex, "titanClass" ))
+
+
+	TitanLoadoutDef Titanloadout = newTitanLoadout
+    
+	TitanStruct CheckingTitan = GetTitanStructByName(Titanloadout.titanClass)
+	
+	if(Titanloadout.titanClass == CheckingTitan.name && CheckingTitan.disabled == true )
+	{
+		shouldChangeTitanLoadout = true
+		
+		int loadoutIndex = GetTitanLoadoutIndexByName(newTitanLoadout.titanClass)
+
+		// the fuck retuns vortex shield 
+		print(Titanloadout.special + "<- current    sollte es sein -> " + GetTitanLoadoutFromPersistentData( player, loadoutIndex ).special)
+
+		//Titanloadout.titanClass = GetFirstAvailableTitan().name
+
+		if(Titanloadout.name == "Null")
+		{
+			svGlobal.forceDisableTitanfalls = false
+			return
+		}
+
+		CheckingTitan = GetTitanStructByName(Titanloadout.titanClass)
+
+		
+//		int loadoutIndex = GetTitanLoadoutIndexByName(newTitanLoadout.titanClass)
+
+	//	Titanloadout.primary = GetTitanLoadoutFromPersistentData( player, loadoutIndex ).primary
+		//Titanloadout = GetTitanLoadoutFromPersistentData( player, loadoutIndex )
+	}
+	/*
+
+
+		if( CheckingTitan.passive1 != "UNDEFINED" )
+		{
+			Titanloadout.passive1 = CheckingTitan.passive1
+			shouldChangeTitanLoadout = true
+		}
+
+		if( CheckingTitan.passive2 != "UNDEFINED" )
+		{
+			Titanloadout.passive2 = CheckingTitan.passive2
+			shouldChangeTitanLoadout = true
+		}
+
+		if( CheckingTitan.passive3 != "UNDEFINED" )
+		{
+			Titanloadout.passive3 = CheckingTitan.passive3
+			shouldChangeTitanLoadout = true
+		}
+
+		if( CheckingTitan.core1 != "UNDEFINED" )
+		{
+			Titanloadout.passive4 = CheckingTitan.core1
+			shouldChangeTitanLoadout = true
+		}
+		
+		if( CheckingTitan.core2 != "UNDEFINED" )
+		{
+			Titanloadout.passive5 = CheckingTitan.core2
+			shouldChangeTitanLoadout = true
+		}
+		
+		if( CheckingTitan.core3 != "UNDEFINED" )
+		{
+			Titanloadout.passive6 = CheckingTitan.core3
+			shouldChangeTitanLoadout = true
+		}
+	*/
+
+
+	// could loop infinetly if I change it every time so need to be carefull 
+	
+	if(shouldChangeTitanLoadout)
+	{
+	 SetActiveTitanLoadoutIndex(player, 0)
+	 SetActiveTitanLoadout(player)
+
+	 SendHudMessage( player, "Titan Loadout changed", 2.5,-2.5,255,0,0, 255, 0, 4, 1 )
+	}
+}
+
+
+TitanStruct function GetTitanStructByName(string TitanName)
+{
+  switch(TitanName)
+  {
+	  	case"ion" :
+	return file.TitanArray[0]
+
+	case "scorch" :
+	return file.TitanArray[1]
+
+	case "northstar":
+	return file.TitanArray[2]
+
+	case "ronin" :
+	return file.TitanArray[3]
+
+	case "tone" :
+	return file.TitanArray[4]
+
+	case "legion" :
+	return file.TitanArray[5]
+
+	case "vanguard" :
+	return file.TitanArray[6] 
+	}
+	return file.TitanArray[0]
 }
