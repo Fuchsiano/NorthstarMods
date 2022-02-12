@@ -25,7 +25,7 @@ struct TitanStruct
 	string passive2,
 	string passive3,
 
-	//thanks monarch for making me  handeling 3 seperet cores  
+	//thanks monarch for making me  handeling 3 seperet core passives
 	string core1,
 	string core2,
 	string core3,
@@ -54,13 +54,11 @@ void function Playlist_Init()
 	// featured mode settings
 	AddCallback_OnPlayerRespawned( FeaturedModeSettingsSetupPilotLoadouts )
 
-	//AddCallback_OnPlayerGetsNewPilotLoadout(FeaturedModeSettingsSetupPilotLoadouts )
 	AddCallback_OnPilotBecomesTitan( FeaturedModeSettingsSetupTitanLoadouts )
 	
 	AddCallback_GameStateEnter( eGameState.Playing, OnGamestartModeSettings)
-	AddCallback_GameStateEnter(	eGameState.Playing, test)
 
-	AddCallback_OnUpdateDerivedPlayerTitanLoadout(TitanTest)
+	AddCallback_OnUpdateDerivedPlayerTitanLoadout(CheckTitan)
 
 	// iron lts rules
 	if ( HasIronRules() ) 
@@ -207,6 +205,7 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player)
 	bool shouldRemoveWeapon3 = false
 	bool shouldRemoveGrenade = false
 	bool shouldRemoveAbility = false
+	
 	int MeleeInKit = 0
 	bool EditedKit = false
 	string message  = "Your Kit used Baned weapons: \n"
@@ -244,10 +243,18 @@ void function FeaturedModeSettingsSetupPilotLoadouts( entity player)
 		for(int i = 0; i < 2; i++){
 		file.GrenadeArray[i].disabled = true
 		} 
-		for(int i = 0; i < 4; i++)
+
+		//titans
+		for(int i = 0; i < 7; i++)
 		{
 			file.TitanArray[i].disabled = true
 		}
+
+		// boostes 
+		for(int i = 0; i < file.BoostArray.len(); i++)
+		{
+		   file.BoostArray[i].disabled = true
+		} 
 
 		////////////////////////////////////////////////////////////////////////////////////// 
 		///////////////////   Using Code 
@@ -635,13 +642,12 @@ TitanStruct function GetFirstAvailableTitan()
 	for(int i = 0; i < file.TitanArray.len(); i++)
 	{
 		TitanStruct CurrentCheckingTitan = file.TitanArray[i]
-		if(CurrentCheckingTitan.disabled == false)
+		if(!CurrentCheckingTitan.disabled)
 		{
 			return CurrentCheckingTitan
 		}
 	}
-
-	TitanStruct nullTitan = {name = "Null", disabled = false, passive1 = "", passive2 = "", passive3= "" , core1 = "", core2 = "" core3 = ""}
+	 TitanStruct	nullTitan = {name = "Null", disabled = false, passive1 = "", passive2 = "", passive3= "" , core1 = "", core2 = "" core3 = ""}
 	return nullTitan
 }
 
@@ -803,42 +809,32 @@ void function InitTitanArray()
 }
 
 
-void function test()
-{
-	foreach(entity player in GetPlayerArray())
-	{
-	for(int i = 0; i < 3; i++){
-	// print("----------------------------------------------------------------------------Test--------------------------------------------" +GetWeaponInfoFileKeyField_Global( player.GetMainWeapons()[ i ].GetWeaponClassName(), "menu_category" ))
-	}
-	}
-}
-
-
-void function TitanTest(entity player,TitanLoadoutDef newTitanLoadout)	
+void function CheckTitan(entity player,TitanLoadoutDef currentTitanLoadout)	
 {
 
 	bool shouldChangeTitanLoadout = false
+	int titanLoadoutIndex
 	
-	if(newTitanLoadout.titanClass != "ion")
+	if(GetTitanStructByName(currentTitanLoadout.titanClass).disabled)
 	{
-	 // newTitanLoadout = GetTitanLoadoutFromPersistentData( player, 0 )
-	 print("-------------------------------- chassi "+ newTitanLoadout.titanClass)
-	 print("---------------------------------primary "+ newTitanLoadout.primary)
-	 print("---------------------------------passive1 " + newTitanLoadout.passive1)
-	
-	print("------------------------------------------------------------------------------------")
-	print("------------------------------------- titan: " + newTitanLoadout.titanClass )
 
-		for(int i =0; i < newTitanLoadout.primaryMod.len(); i++)
+	 TitanStruct	titanStruct  = GetFirstAvailableTitan()
+		
+		if(titanStruct.name == "Null")
 		{
-		 print("------------------------------------- mods: " + newTitanLoadout.primaryMod[i])
+			svGlobal.forceDisableTitanfalls = false
+			return
 		}
-	//newTitanLoadout.primaryMods = 	[ GetTitanLoadoutFromPersistentData( player, 0 ).primaryMod ]
+		 titanLoadoutIndex = GetTitanLoadoutIndexByName(titanStruct.name)
 
-	print("-------------------------------------------------------" + GetTitanLoadoutFromPersistentData( player, 1 ).primaryMod)
+	 print("------ Changet Titan to " + titanStruct.name)
 	
 	 shouldChangeTitanLoadout = true
 	} 
+	else
+	{
+		titanLoadoutIndex = GetTitanLoadoutIndexByName(currentTitanLoadout.titanClass)
+	}
 /*
 	print("------------------- edited Titan loadout")
 	 int loadoutIndex = GetTitanLoadoutIndexByName(newTitanLoadout.titanClass)
@@ -921,8 +917,7 @@ void function TitanTest(entity player,TitanLoadoutDef newTitanLoadout)
 	
 	if(shouldChangeTitanLoadout)
 	{
-	 SetActiveTitanLoadoutIndex(player, 0)
-	 SetActiveTitanLoadout(player)
+	 SetPersistentSpawnLoadoutIndex(player,"titan", titanLoadoutIndex)
 
 	 SendHudMessage( player, "Titan Loadout changed", 2.5,-2.5,255,0,0, 255, 0, 4, 1 )
 	}
@@ -954,5 +949,6 @@ TitanStruct function GetTitanStructByName(string TitanName)
 	case "vanguard" :
 	return file.TitanArray[6] 
 	}
+	print("Titan Name Out of Range")
 	return file.TitanArray[0]
 }
